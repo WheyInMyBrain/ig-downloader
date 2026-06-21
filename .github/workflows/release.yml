@@ -3,16 +3,15 @@ name: Build and Publish Releases
 on:
   push:
     tags:
-      - 'v*' # Triggers the pipeline when pushing a version tag like v1.0.0
+      - 'v*' # Triggers the pipeline when pushing a version tag like v1.5.0
 
 permissions:
-  contents: write # Grants permissions to create and attach binaries to the release page
+  contents: write # Required permission to build, upload, and attach binary objects to release drafts
 
 jobs:
-  build-and-release:
-    name: Compile and Publish Assets
+  compile-binaries:
+    name: Cross Compile Binaries
     runs-on: ubuntu-latest
-    
     strategy:
       matrix:
         include:
@@ -33,29 +32,52 @@ jobs:
             artifact_name: ig-downloader-mac-arm64
 
     steps:
-      # Step 1: Checkout the source repository code
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Step 2: Set up the official Go compilation runtime environment
       - name: Set up Go Runtime
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22' # Match this to your go.mod specification
+          go-version: '1.26.3' 
 
-      # Step 3: Run cross-compilation matrix variables
-      - name: Compile Standalone Binary Binary
+      - name: Compile Standalone Static Binary
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0 # Enforce pure static zero-dependency compilation
         run: |
-          go build -o build/${{ matrix.artifact_name }} ./src
+          # Added optimizations flags (-s -w) to shrink the final binaries file size
+          go build -ldflags="-s -w" -o build/${{ matrix.artifact_name }} ./src
 
-      # Step 4: Publish compiled assets onto the GitHub Release dashboard
-      - name: Upload Artifacts to GitHub Release
+      # Temporarily store the compiled file as an unreleased action artifact
+      - name: Stash Artifact Temp Link
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: build/${{ matrix.artifact_name }}
+          retinuation-token: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-release:
+    name: Publish Assets to Release
+    needs: compile-binaries # Forces this block to wait until all parallel compilation jobs finish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Download all 4 binaries back from the temporary action storage folder space
+      - name: Download Stashed Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts/
+          merge-multiple: true # Flattens files directly into a single folder level
+
+      # Single thread release execution prevents server race condition collisions
+      - name: Create Single Unified Release
         uses: softprops/action-gh-release@v2
         with:
-          files: build/${{ matrix.artifact_name }}
+          files: release-artifacts/*
+          draft: false
+          prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Automatically provided by GitHub
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

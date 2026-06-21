@@ -110,6 +110,12 @@ func GatherAndStructurePosts(client *http.Client, username string) ([]TargetPost
 
 		fmt.Printf("    -> Structured %d assets on this page. (Total Pooled: %d)\n", pageAssetsCount, len(structuredAssets))
 
+		// Stream the structural updates live to the webpage if running via UI server
+		select {
+		case WebProgressChan <- ProgressEvent{Category: "posts", Type: "init_update", Value: len(structuredAssets)}:
+		default:
+		}
+
 		nextMaxID = feedData.NextMaxID
 		hasMore = nextMaxID != ""
 

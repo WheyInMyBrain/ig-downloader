@@ -173,6 +173,12 @@ func GatherAndStructureHighlights(client *http.Client, username string) ([]Targe
 				})
 			}
 		}
+
+		// Stream the dynamic running totals live to the web page UI
+		select {
+		case WebProgressChan <- ProgressEvent{Category: "highlights", Type: "init_update", Value: len(structuredAssets)}:
+		default:
+		}
 	}
 
 	return structuredAssets, nil

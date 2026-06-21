@@ -2,9 +2,14 @@ package main
 
 const (
 	// Core Web Desktop Framework Headers
-	UserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Safari/605.1.15"
+	UserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:152.0) Gecko/20100101 Firefox/152.0"
 	AppID     = "936619743392459"
-	
-	// Verified Static GraphQL Hash template for Story Highlights
-	StoryGraphQLQueryID = "9957820854288654"
+	ASBDID    = "359341"
+
+	// Verified Static GraphQL Hash templates for Module Engines
+	StoryGraphQLQueryID = "9957820854288654" 		// THis is for Highlighs
+	ReelsGraphQLDocID   = "24127588873492897"
+	StoryGraphQLDocID   = "27291129290536893"
+
+	FallbackLSD = "LBp5NuLXbbw0i4Zmv68Jho"
 )

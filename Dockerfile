@@ -5,12 +5,12 @@ WORKDIR /app
 
 # Copy the dependency specs first to leverage Docker caching
 COPY go.mod ./
-RUN gomod download || true
+RUN go mod download || true
 
 # Copy all the rest of the project repository files
 COPY . .
 
-# Compile a statically linked, highly optimized standalone binary targeting the src directory layout
+# Compile a statically linked, highly optimized standalone binary
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /ig-downloader ./src
 
 # Stage 2: Final minimal runtime execution layer
@@ -24,8 +24,14 @@ WORKDIR /root/
 # Copy the compiled binary over from the builder stage
 COPY --from=builder /ig-downloader .
 
+# Create the internal target directory where downloads will collect
+RUN mkdir /downloads
+
+# Inform Docker that this path maps to external host storage
+VOLUME ["/downloads"]
+
 # Expose the local hosting UI gateway port
 EXPOSE 8080
 
-# Execute the application in web server layout by default
-ENTRYPOINT ["./ig-downloader", "--serve"]
+# Execute the application, forcing the Output Directory fallback to our Volume anchor point
+ENTRYPOINT ["./ig-downloader", "--serve", "--dir=/downloads"]

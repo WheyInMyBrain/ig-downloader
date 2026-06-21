@@ -14,15 +14,16 @@ type DownloadConfig struct {
 	DownloadPosts      bool
 	DownloadHighlights bool
 	DownloadReels      bool
+	DownloadStories    bool
 	Concurrency        int
 	ServeUI            bool
+	OutputDir          string 
 }
 
 func ParseCLICookies() {
 	for i := 1; i < len(os.Args); i++ {
 		arg := os.Args[i]
 
-		// Format 1: --cookies "raw string or json"
 		if arg == "--cookies" && i+1 < len(os.Args) {
 			err := ParseAndSaveCookies(os.Args[i+1])
 			if err != nil {
@@ -32,7 +33,6 @@ func ParseCLICookies() {
 			os.Exit(0)
 		}
 
-		// Format 2: --cookies="raw string or json"
 		if strings.HasPrefix(arg, "--cookies=") {
 			cookieVal := strings.TrimPrefix(arg, "--cookies=")
 			err := ParseAndSaveCookies(cookieVal)
@@ -48,9 +48,10 @@ func ParseCLICookies() {
 func ParseCLIProfileURL() (DownloadConfig, error) {
 	var config DownloadConfig
 	config.Concurrency = 10
+	config.OutputDir = "." // Defaults to binary local footprint directory mapping context
 
 	if len(os.Args) < 2 {
-		return config, errors.New("missing profile target link.\nUsage: go run . <instagram-profile-url> [--p] [--h] [--r] [--serve] [--cookies '<data>']")
+		return config, errors.New("missing profile target link.\nUsage: go run . <instagram-profile-url> [--p] [--h] [--r] [--s] [--dir '<path>'] [--serve] [--cookies '<data>']")
 	}
 
 	var inputURL string
@@ -67,6 +68,7 @@ func ParseCLIProfileURL() (DownloadConfig, error) {
 				config.DownloadPosts = true
 				config.DownloadHighlights = false
 				config.DownloadReels = false
+				config.DownloadStories = false
 				hasExplicitMode = true
 			} else {
 				config.DownloadPosts = true
@@ -76,6 +78,7 @@ func ParseCLIProfileURL() (DownloadConfig, error) {
 				config.DownloadHighlights = true
 				config.DownloadPosts = false
 				config.DownloadReels = false
+				config.DownloadStories = false
 				hasExplicitMode = true
 			} else {
 				config.DownloadHighlights = true
@@ -85,9 +88,20 @@ func ParseCLIProfileURL() (DownloadConfig, error) {
 				config.DownloadReels = true
 				config.DownloadPosts = false
 				config.DownloadHighlights = false
+				config.DownloadStories = false
 				hasExplicitMode = true
 			} else {
 				config.DownloadReels = true
+			}
+		case "--s": 
+			if !hasExplicitMode {
+				config.DownloadStories = true
+				config.DownloadPosts = false
+				config.DownloadHighlights = false
+				config.DownloadReels = false
+				hasExplicitMode = true
+			} else {
+				config.DownloadStories = true
 			}
 		case "--workers":
 			if i+1 < len(os.Args) {
@@ -97,6 +111,11 @@ func ParseCLIProfileURL() (DownloadConfig, error) {
 				}
 				i++
 			}
+		case "--dir": // Handle explicit base output folder flag mapping structure
+			if i+1 < len(os.Args) {
+				config.OutputDir = strings.TrimSpace(os.Args[i+1])
+				i++
+			}
 		default:
 			if strings.HasPrefix(arg, "--workers=") {
 				valStr := strings.TrimPrefix(arg, "--workers=")
@@ -104,6 +123,8 @@ func ParseCLIProfileURL() (DownloadConfig, error) {
 				if err == nil && val > 0 {
 					config.Concurrency = val
 				}
+			} else if strings.HasPrefix(arg, "--dir=") { // Handle shorthand formatting properties inline
+				config.OutputDir = strings.TrimSpace(strings.TrimPrefix(arg, "--dir="))
 			} else if !strings.HasPrefix(arg, "-") && inputURL == "" {
 				inputURL = strings.TrimSpace(arg)
 			}
@@ -118,6 +139,7 @@ func ParseCLIProfileURL() (DownloadConfig, error) {
 		config.DownloadPosts = true
 		config.DownloadHighlights = true
 		config.DownloadReels = true
+		config.DownloadStories = true
 	}
 
 	if inputURL == "" {

@@ -37,13 +37,11 @@ func OrchestrateEngine() {
 			for _, asset := range postAssets {
 				collectiveDownloadQueue = append(collectiveDownloadQueue, UniversalDownloadAsset{
 					DownloadURL: asset.DownloadURL,
-					LocalPath:   asset.LocalPath,
+					LocalPath:   filepath.Join(config.OutputDir, asset.LocalPath),
 					Category:    "posts",
 				})
 			}
 		}
-	} else {
-		fmt.Println("[Engine] Skipping timeline grid posts extraction (--p flag absent).")
 	}
 
 	// -------------------------------------------------------------------------
@@ -58,17 +56,15 @@ func OrchestrateEngine() {
 			for _, asset := range highlightAssets {
 				collectiveDownloadQueue = append(collectiveDownloadQueue, UniversalDownloadAsset{
 					DownloadURL: asset.DownloadURL,
-					LocalPath:   asset.LocalPath,
+					LocalPath:   filepath.Join(config.OutputDir, asset.LocalPath),
 					Category:    "highlights",
 				})
 			}
 		}
-	} else {
-		fmt.Println("\n[Engine] Skipping story highlight trays extraction (--h flag absent).")
 	}
 
 	// -------------------------------------------------------------------------
-	// MODULE 3: REELS EXTRACTION LAYER (reels.go) — Runs only if authenticated
+	// VERIFY AUTHENTICATION ENVIRONMENT (Required for Reels & Stories)
 	// -------------------------------------------------------------------------
 	exePath, err := os.Executable()
 	hasCookies := false
@@ -78,6 +74,9 @@ func OrchestrateEngine() {
 	}
 
 	if hasCookies {
+		// -------------------------------------------------------------------------
+		// MODULE 3: REELS EXTRACTION LAYER (reels.go)
+		// -------------------------------------------------------------------------
 		fmt.Printf("\n[Engine] Authenticated state detected. Initiating Reels extraction for @%s...\n", config.Username)
 		reelAssets, err := GatherAndStructureReels(client, config.Username)
 		if err != nil {
@@ -86,13 +85,30 @@ func OrchestrateEngine() {
 			for _, asset := range reelAssets {
 				collectiveDownloadQueue = append(collectiveDownloadQueue, UniversalDownloadAsset{
 					DownloadURL: asset.DownloadURL,
-					LocalPath:   asset.LocalPath,
+					LocalPath:   filepath.Join(config.OutputDir, asset.LocalPath),
 					Category:    "reels",
 				})
 			}
 		}
+
+		// -------------------------------------------------------------------------
+		// MODULE 4: ACTIVE STORIES EXTRACTION LAYER (stories.go)
+		// -------------------------------------------------------------------------
+		fmt.Printf("\n[Engine] Initiating active Stories extraction layer for @%s...\n", config.Username)
+		storyAssets, err := GatherAndStructureStories(client, config.Username)
+		if err != nil {
+			fmt.Printf("[Engine Error] Stories extraction failed: %v\n", err)
+		} else {
+			for _, asset := range storyAssets {
+				collectiveDownloadQueue = append(collectiveDownloadQueue, UniversalDownloadAsset{
+					DownloadURL: asset.DownloadURL,
+					LocalPath:   filepath.Join(config.OutputDir, asset.LocalPath),
+					Category:    "stories",
+				})
+			}
+		}
 	} else {
-		fmt.Println("\n[Engine] Skipping Reels extraction (.env cookies profile missing).")
+		fmt.Println("\n[Engine] Skipping Authenticated Modules (Reels & Stories) because .env file is missing.")
 	}
 
 	// -------------------------------------------------------------------------

@@ -149,11 +149,11 @@ func GatherAndStructureReels(client *http.Client, username string) ([]TargetReel
 		varsBytes, _ := json.Marshal(variables)
 
 		formData := url.Values{}
-		formData.Set("lsd", "LBp5NuLXbbw0i4Zmv68Jho")
+		formData.Set("lsd", FallbackLSD)
 		formData.Set("fb_api_caller_class", "RelayModern")
 		formData.Set("fb_api_req_friendly_name", "PolarisProfileReelsTabContentQuery")
 		formData.Set("variables", string(varsBytes))
-		formData.Set("doc_id", "24127588873492897")
+		formData.Set("doc_id", ReelsGraphQLDocID)
 
 		req, err := http.NewRequest("POST", targetURL, bytes.NewBufferString(formData.Encode()))
 		if err != nil {
@@ -164,8 +164,8 @@ func GatherAndStructureReels(client *http.Client, username string) ([]TargetReel
 		
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Set("X-FB-Friendly-Name", "PolarisProfileReelsTabContentQuery")
-		req.Header.Set("X-FB-LSD", "LBp5NuLXbbw0i4Zmv68Jho")
-		req.Header.Set("X-ASBD-ID", "359341")
+		req.Header.Set("X-FB-LSD", FallbackLSD)
+		req.Header.Set("X-ASBD-ID", ASBDID)
 		req.Header.Set("Origin", "https://www.instagram.com")
 		req.Header.Set("Referer", fmt.Sprintf("https://www.instagram.com/%s/reels/", username))
 
@@ -230,7 +230,7 @@ func GatherAndStructureReels(client *http.Client, username string) ([]TargetReel
 				})
 			}
 
-			time.Sleep(1000 * time.Millisecond)
+			time.Sleep(500 * time.Millisecond)
 		}
 
 		reelsCount := len(structuredAssets) / 2
@@ -245,7 +245,7 @@ func GatherAndStructureReels(client *http.Client, username string) ([]TargetReel
 
 		if hasNextPage {
 			page++
-			time.Sleep(1000 * time.Millisecond)
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 

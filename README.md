@@ -102,5 +102,3 @@ docker run -d -p 8080:8080 --name ig-dl-server ig-downloader
 
 
 3. Open `http://localhost:8080` in your web browser to download assets.
-
-```

@@ -1,0 +1,61 @@
+name: Build and Publish Releases
+
+on:
+  push:
+    tags:
+      - 'v*' # Triggers the pipeline when pushing a version tag like v1.0.0
+
+permissions:
+  contents: write # Grants permissions to create and attach binaries to the release page
+
+jobs:
+  build-and-release:
+    name: Compile and Publish Assets
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        include:
+          # Windows Target Matrices
+          - goos: windows
+            goarch: amd64
+            artifact_name: ig-downloader-windows-amd64.exe
+          - goos: windows
+            goarch: arm64
+            artifact_name: ig-downloader-windows-arm64.exe
+            
+          # macOS Target Matrices
+          - goos: darwin
+            goarch: amd64
+            artifact_name: ig-downloader-mac-amd64
+          - goos: darwin
+            goarch: arm64
+            artifact_name: ig-downloader-mac-arm64
+
+    steps:
+      # Step 1: Checkout the source repository code
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Step 2: Set up the official Go compilation runtime environment
+      - name: Set up Go Runtime
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22' # Match this to your go.mod specification
+
+      # Step 3: Run cross-compilation matrix variables
+      - name: Compile Standalone Binary Binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0 # Enforce pure static zero-dependency compilation
+        run: |
+          go build -o build/${{ matrix.artifact_name }} .
+
+      # Step 4: Publish compiled assets onto the GitHub Release dashboard
+      - name: Upload Artifacts to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/${{ matrix.artifact_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Automatically provided by GitHub

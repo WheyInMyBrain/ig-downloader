@@ -3,36 +3,86 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
-const HTMLPage = `<!DOCTYPE html>
+// Helper function to check if configuration state file currently exists on disk
+func hasSavedCookies() bool {
+	exePath, err := os.Executable()
+	if err != nil {
+		return false
+	}
+	_, err = os.Stat(filepath.Join(filepath.Dir(exePath), ".env"))
+	return err == nil
+}
+
+func getHTMLPage() string {
+	buttonText := "Enter Cookies"
+	reelsCheckboxStyle := "display: none;" // Hidden by default if cookies are absent
+	
+	if hasSavedCookies() {
+		buttonText = "Update Cookies"
+		reelsCheckboxStyle = "display: block;" // Render inline if cookies are detected
+	}
+
+	return `<!DOCTYPE html>
 <html>
 <head>
     <title>ig-downloader UI</title>
     <style>
         body { font-family: sans-serif; max-width: 500px; margin: 40px auto; padding: 20px; background: #fafafa; color: #333; }
-        .box { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .box { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); position: relative; }
+        .top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .top-row h2 { margin: 0; }
+        .cookie-trigger-btn { background: #333; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
         input[type="text"] { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
-        button { background: #0095f6; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; }
+        .action-btn { background: #0095f6; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; }
         .row { display: flex; gap: 20px; margin: 15px 0; }
         .progress-container { margin-top: 20px; display: none; }
         .bar-wrapper { margin-bottom: 15px; }
         .bar-label { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px; text-transform: capitalize; }
         progress { width: 100%; height: 20px; }
+        
+        /* Modal Popup System Overlay */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); }
+        .modal-content { background: white; margin: 15% auto; padding: 20px; border-radius: 8px; width: 320px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); position: relative; }
+        .modal-content h3 { margin-top: 0; }
+        .modal-content textarea { width: 100%; height: 120px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; resize: vertical; margin: 10px 0; font-size: 11px; }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+        .btn-close { background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+        .btn-save { background: #22c55e; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
     </style>
 </head>
 <body>
+    <div id="cookieModal" class="modal">
+        <div class="modal-content">
+            <h3>Session Cookies</h3>
+            <textarea id="cookieInput" placeholder="Paste raw headers text or JSON cookies array here..."></textarea>
+            <div class="modal-actions">
+                <button class="btn-close" onclick="closeModal()">Cancel</button>
+                <button class="btn-save" onclick="saveCookies()">Save</button>
+            </div>
+        </div>
+    </div>
+
     <div class="box">
-        <h2>Instagram Downloader</h2>
+        <div class="top-row">
+            <h2>Instagram Downloader</h2>
+            <button id="cookieBtn" class="cookie-trigger-btn" onclick="openModal()">` + buttonText + `</button>
+        </div>
+        
         <input type="text" id="url" placeholder="Paste instagram profile link here...">
         <div class="row">
             <label><input type="checkbox" id="posts" checked> Posts</label>
             <label><input type="checkbox" id="highlights" checked> Highlights</label>
+            <label id="reelsLabel" style="` + reelsCheckboxStyle + `"><input type="checkbox" id="reels" checked> Reels</label>
         </div>
-        <button id="startBtn" onclick="startDownload()">Download</button>
+        <button class="action-btn" id="startBtn" onclick="startDownload()">Download</button>
 
         <div id="progressSection" class="progress-container">
             <h3>Download Progress</h3>
@@ -44,10 +94,34 @@ const HTMLPage = `<!DOCTYPE html>
         let eventSource = null;
         let progressData = {};
 
+        function openModal() { document.getElementById('cookieModal').style.display = 'block'; }
+        function closeModal() { document.getElementById('cookieModal').style.display = 'none'; }
+
+        function saveCookies() {
+            const rawData = document.getElementById('cookieInput').value;
+            if(!rawData.trim()) return alert("Cookie payload is empty.");
+
+            fetch('/update-cookies', { method: 'POST', body: rawData })
+            .then(res => {
+                if(!res.ok) throw new Error("Processing failed");
+                return res.text();
+            })
+            .then(msg => {
+                alert(msg);
+                document.getElementById('cookieBtn').innerText = "Update Cookies";
+                document.getElementById('reelsLabel').style.display = "block"; // Make tick box visible instantly on save
+                document.getElementById('cookieInput').value = '';
+                closeModal();
+            })
+            .catch(err => alert("Error saving cookies: " + err));
+        }
+
         function startDownload() {
             const url = document.getElementById('url').value;
             const runPosts = document.getElementById('posts').checked;
             const runHighlights = document.getElementById('highlights').checked;
+            const reelsEl = document.getElementById('reels');
+            const runReels = reelsEl ? reelsEl.checked : false;
 
             if(!url) return alert("Please specify a profile link");
 
@@ -57,6 +131,7 @@ const HTMLPage = `<!DOCTYPE html>
 
             if(runPosts) createProgressTrack('posts');
             if(runHighlights) createProgressTrack('highlights');
+            if(runReels) createProgressTrack('reels');
 
             if(eventSource) eventSource.close();
             eventSource = new EventSource('/stream');
@@ -83,11 +158,10 @@ const HTMLPage = `<!DOCTYPE html>
                 }
             };
 
-            // Fire download independently to avoid EventSource open-handshake locking bugs
             fetch('/download', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: "url=" + encodeURIComponent(url) + "&posts=" + runPosts + "&highlights=" + runHighlights
+                body: "url=" + encodeURIComponent(url) + "&posts=" + runPosts + "&highlights=" + runHighlights + "&reels=" + runReels
             });
         }
 
@@ -106,10 +180,30 @@ const HTMLPage = `<!DOCTYPE html>
     </script>
 </body>
 </html>`
+}
 
 func StartLocalWebServer() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, HTMLPage)
+		fmt.Fprint(w, getHTMLPage())
+	})
+
+	http.HandleFunc("/update-cookies", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost { return }
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "Failed reading input stream.")
+			return
+		}
+
+		err = ParseAndSaveCookies(string(bodyBytes))
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "Parse Error: %v", err)
+			return
+		}
+
+		fmt.Fprint(w, "Cookies updated successfully!")
 	})
 
 	http.HandleFunc("/download", func(w http.ResponseWriter, r *http.Request) {
@@ -125,6 +219,7 @@ func StartLocalWebServer() {
 			Username:           segments[0],
 			DownloadPosts:      r.FormValue("posts") == "true",
 			DownloadHighlights: r.FormValue("highlights") == "true",
+			DownloadReels:      r.FormValue("reels") == "true",
 			Concurrency:        10,
 		}
 
@@ -167,6 +262,16 @@ func runWebDownloadPipeline(config DownloadConfig) {
 			WebProgressChan <- ProgressEvent{Category: "highlights", Type: "init", Value: len(assets)}
 			for _, a := range assets {
 				queue = append(queue, UniversalDownloadAsset{DownloadURL: a.DownloadURL, LocalPath: a.LocalPath, Category: "highlights"})
+			}
+		}
+	}
+
+	if config.DownloadReels && hasSavedCookies() {
+		assets, err := GatherAndStructureReels(client, config.Username)
+		if err == nil {
+			WebProgressChan <- ProgressEvent{Category: "reels", Type: "init", Value: len(assets)}
+			for _, a := range assets {
+				queue = append(queue, UniversalDownloadAsset{DownloadURL: a.DownloadURL, LocalPath: a.LocalPath, Category: "reels"})
 			}
 		}
 	}

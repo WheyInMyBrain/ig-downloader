@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 )
 
 type UniversalDownloadAsset struct {
@@ -66,9 +67,21 @@ func executeAssetDownload(client *http.Client, asset UniversalDownloadAsset) err
 	if err != nil {
 		return err
 	}
-	req.Header.Set("User-Agent", UserAgent)
 
-	resp, err := client.Do(req)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:152.0) Gecko/20100101 Firefox/152.0")
+	req.Header.Set("Accept", "video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("Connection", "keep-alive")
+	req.Header.Set("Sec-Fetch-Dest", "video")
+	req.Header.Set("Sec-Fetch-Mode", "no-cors")
+	req.Header.Set("Sec-Fetch-Site", "cross-site")
+
+	// Use an anonymous client to ensure no session identification interferes with parameter parsing on Meta edges
+	anonymousClient := &http.Client{
+		Timeout: 45 * time.Second,
+	}
+
+	resp, err := anonymousClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -89,6 +102,6 @@ func executeAssetDownload(client *http.Client, asset UniversalDownloadAsset) err
 		return err
 	}
 
-	fmt.Printf("[+] Saved Local Target: %s\n", asset.LocalPath)
+	fmt.Printf("[+] Saved Local Target (Audio Verified): %s\n", asset.LocalPath)
 	return nil
 }

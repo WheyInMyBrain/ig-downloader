@@ -16,11 +16,10 @@ A zero-dependency, standalone CLI tool to download timeline posts and story high
 
 1. Open your **Terminal** app.
 2. Grant execution permissions to the downloaded file:
-   ```bash
+```bash
    chmod +x ./ig-downloader-mac-arm64
 
 ```
-
 3. Run the binary against a profile link:
 ```bash
 ./ig-downloader-mac-arm64 [https://www.instagram.com/username/](https://www.instagram.com/username/)
@@ -37,7 +36,6 @@ A zero-dependency, standalone CLI tool to download timeline posts and story high
 .\ig-downloader-windows-amd64.exe [https://www.instagram.com/username/](https://www.instagram.com/username/)
 
 ```
-
 
 
 ---

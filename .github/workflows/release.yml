@@ -50,7 +50,7 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0 # Enforce pure static zero-dependency compilation
         run: |
-          go build -o build/${{ matrix.artifact_name }} .
+          go build -o build/${{ matrix.artifact_name }} ./src
 
       # Step 4: Publish compiled assets onto the GitHub Release dashboard
       - name: Upload Artifacts to GitHub Release
